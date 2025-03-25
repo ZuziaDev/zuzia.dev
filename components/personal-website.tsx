@@ -30,6 +30,7 @@ const GRADIENT_COLORS = [
   "from-rose-600 to-pink-600",
   "from-sky-600 to-indigo-600",
   "from-fuchsia-600 to-purple-600",
+  "from-lime-600 to-fuchsia-600",
   "from-emerald-600 to-lime-600",
   "from-gray-600 to-slate-600",
   "from-slate-600 to-zinc-600",
