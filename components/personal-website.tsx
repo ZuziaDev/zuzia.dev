@@ -43,6 +43,15 @@ const GRADIENT_COLORS = [
 const FALLBACK_PROJECTS = [
   {
     id: 1,
+    name: "zuzia.dev",
+    description: "Zuzia.dev Web Sitesi",
+    technologies: ["TypeScript","JavaScript", "CSS"],
+    url: "https://github.com/ZuziaDev/zuzia.dev",
+    updatedAt: "3 years ago",
+    color: "from-lime-600 to-fuchsia-600",
+  },
+  {
+    id: 2,
     name: "Zuzia-Code-Api-v2",
     description: "Zuzia API 2.0.0",
     technologies: ["JavaScript", "HTML"],
@@ -51,7 +60,7 @@ const FALLBACK_PROJECTS = [
     color: "from-purple-600 to-blue-600",
   },
   {
-    id: 2,
+    id: 3,
     name: "Zuzia-Site-v2",
     description: "Zuzia Site V2.0.0",
     technologies: ["JavaScript", "EJS", "CSS"],
@@ -60,7 +69,7 @@ const FALLBACK_PROJECTS = [
     color: "from-pink-600 to-purple-600",
   },
   {
-    id: 3,
+    id: 4,
     name: "Discord.js-v14-bos-altyapi",
     description: "Discord.js V14 Slash Boş Altyapı",
     technologies: ["JavaScript"],
@@ -69,6 +78,7 @@ const FALLBACK_PROJECTS = [
     color: "from-emerald-600 to-lime-600",
   },
 ]
+
 
 interface Project {
   id: number
