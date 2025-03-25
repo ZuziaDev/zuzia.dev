@@ -3,7 +3,7 @@
 import type React from "react"
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
-import { Github, Instagram, Youtube, Twitter, Discord } from "lucide-react"
+import { Github, Instagram, Youtube, Twitter} from "lucide-react"
 import BackgroundPaths from "@/components/background-paths"
 import ThemeToggle from "@/components/theme-toggle"
 import SpotifyNowPlaying from "@/components/spotify-now-playing"
@@ -198,12 +198,6 @@ export default function PersonalWebsite() {
               href="https://youtube.com/ZuziaKirai"
               icon={<Youtube className="w-5 h-5" />}
               label="YouTube"
-              color="hover:bg-red-600"
-            />
-            <SocialLink
-              href="https://discord.gg/StZjQ6T5Cm"
-              icon={<Discord className="w-5 h-5" />}
-              label="Discord"
               color="hover:bg-red-600"
             />
           </div>
