@@ -190,6 +190,12 @@ export default function PersonalWebsite() {
               label="YouTube"
               color="hover:bg-red-600"
             />
+            <SocialLink
+              href="https://discord.gg/StZjQ6T5Cm"
+              icon={<Discord className="w-5 h-5" />}
+              label="Discord"
+              color="hover:bg-red-600"
+            />
           </div>
 
           {/* Spotify Now Playing */}
