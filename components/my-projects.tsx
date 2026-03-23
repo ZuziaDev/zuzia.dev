@@ -23,7 +23,6 @@ const projects: Project[] = [
     image: 'neuroa_banner.png',
     techStack: ["JavaScript", 'Next.js', "Firebase", "Redis"],
     liveUrl: 'https://patreon.com/NeuroaAI',
-    githubUrl: 'https://github.com',
     discordUrl: 'https://discord.gg/gSfkTJkr5U',
     featured: true,
   },
