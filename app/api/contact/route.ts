@@ -50,7 +50,7 @@ export async function POST(request: Request) {
       )
     }
 
-    const resendApiKey = `re_9rf39qSw_7MDMvmd3FUzDv9KC2qacvRjP`
+    const resendApiKey = process.env.RESEND_KEY
     const toEmail = "contact@zuzia.dev"
     const fromEmail = `Portfolio Contact <${toEmail}>`
 
