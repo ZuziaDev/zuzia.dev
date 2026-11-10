@@ -1,66 +1,78 @@
 'use client'
 
-import { motion } from 'framer-motion'
-import { ArrowLeft } from 'lucide-react'
+import Link from 'next/link'
+import { ArrowRight } from 'lucide-react'
 import { Navbar } from '@/components/navbar'
 import { Footer } from '@/components/footer'
-import { Button } from '@/components/ui/button'
-import Link from 'next/link'
+import { Reveal, SplitText } from '@/components/fx/motion'
 import { useI18n } from '@/lib/i18n-context'
+
+const onward = [
+  { href: '/projects', key: 'chrome.blog.toProjects' },
+  { href: '/contact', key: 'chrome.blog.toContact' },
+]
 
 export default function BlogPage() {
   const { t } = useI18n()
 
   return (
-    <main className="relative min-h-screen overflow-hidden">
+    <>
       <Navbar />
+      <main id="main" className="relative min-h-screen pb-24 pt-[calc(var(--nav-h)+3rem)] sm:pb-32">
+        <div className="shell">
+          <header className="max-w-3xl">
+            <SplitText as="h1" text={t('blog.title')} trigger="mount" className="t-title" />
+            <Reveal variant="unblur" delay={0.15}>
+              <p className="t-lead mt-4">{t('blog.subtitle')}</p>
+            </Reveal>
+          </header>
 
-      <section className="relative pt-32 pb-24 sm:pb-32 overflow-hidden">
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-primary/10 rounded-full blur-[120px]" />
-          <div className="absolute bottom-1/3 left-0 w-80 h-80 bg-accent/10 rounded-full blur-[100px]" />
-        </div>
+          <Reveal variant="wipe" delay={0.25} duration={1.1}>
+            <div className="seam mt-12 sm:mt-16" />
+          </Reveal>
 
-        <div className="relative z-10 mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <Link href="/">
-            <Button variant="ghost" className="mb-8 gap-2">
-              <ArrowLeft className="w-4 h-4" />
-              {t('nav.home')}
-            </Button>
-          </Link>
+          <section className="grid gap-x-16 gap-y-10 pt-12 sm:pt-16 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] lg:items-end">
+            <SplitText
+              as="h2"
+              by="char"
+              stagger={0.03}
+              delay={0.3}
+              trigger="mount"
+              text={t('blog.comingSoon')}
+              className="t-display"
+            />
 
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="text-center mb-16"
-          >
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-4">
-              {t('blog.title')}
-            </h1>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              {t('blog.subtitle')}
-            </p>
-          </motion.div>
+            <div className="max-w-[52ch]">
+              <Reveal variant="rise" delay={0.5}>
+                <p className="text-lg leading-relaxed">{t('blog.temporaryNotice')}</p>
+              </Reveal>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="glass-card px-8 py-16 text-center"
-          >
-            <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-secondary flex items-center justify-center">
-              <span className="text-4xl font-bold text-muted-foreground">!</span>
+              <Reveal variant="rise" delay={0.62}>
+                <h3 className="mt-10 text-sm font-medium text-muted-foreground font-sans">
+                  {t('chrome.blog.onward')}
+                </h3>
+                <ul className="mt-3 border-t border-border">
+                  {onward.map(({ href, key }) => (
+                    <li key={href} className="border-b border-border">
+                      <Link
+                        href={href}
+                        className="group flex min-h-14 items-center justify-between gap-4 py-3 font-display text-lg font-semibold tracking-[-0.02em]"
+                      >
+                        {t(key)}
+                        <ArrowRight
+                          aria-hidden="true"
+                          className="size-5 shrink-0 text-muted-foreground transition-[transform,color] duration-200 group-hover:translate-x-1 group-hover:text-primary"
+                        />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </Reveal>
             </div>
-            <h2 className="text-2xl font-bold mb-3">{t('blog.comingSoon')}</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              {t('blog.temporaryNotice')}
-            </p>
-          </motion.div>
+          </section>
         </div>
-      </section>
-
+      </main>
       <Footer />
-    </main>
+    </>
   )
 }

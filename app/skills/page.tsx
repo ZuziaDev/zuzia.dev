@@ -1,216 +1,285 @@
 'use client'
 
-import { motion } from 'framer-motion'
-import {
-  SiAnthropic,
-  SiArkecosystem,
-  SiBun,
-  SiCloudinary,
-  SiExpress,
-  SiFigma,
-  SiFirebase,
-  SiFlydotio,
-  SiFramer,
-  SiGit,
-  SiJavascript,
-  SiLinux,
-  SiMeta,
-  SiNextdotjs,
-  SiReact,
-  SiNodedotjs,
-  SiOpenai,
-  SiPenpot,
-  SiPytorch,
-  SiPython,
-  SiRedis,
-  SiRender,
-  SiResend,
-  SiSocketdotio,
-  SiHtml5,
-  SiCss,
-  SiTypescript,
-  SiTailwindcss,
-  SiVercel,
-} from 'react-icons/si'
-import { GrGenai } from 'react-icons/gr'
-import { ArrowLeft } from 'lucide-react'
+import { AnimatePresence, MotionConfig, motion, useReducedMotion } from 'framer-motion'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Navbar } from '@/components/navbar'
 import { Footer } from '@/components/footer'
-import { Button } from '@/components/ui/button'
-import Link from 'next/link'
+import { CountUp, EASE_OUT, Reveal, SplitText } from '@/components/fx/motion'
+import { fill } from '@/components/skills/format'
+import { HeatBoard } from '@/components/skills/heat-board'
+import { SkillRow } from '@/components/skills/skill-row'
+import { SkillsToolbar, type SkillFilter, type SkillSort } from '@/components/skills/skills-toolbar'
 import { useI18n } from '@/lib/i18n-context'
+import { allSkills, skillCategories, skillRowId } from '@/lib/skills-data'
 
-const skillCategories = [
-  {
-    key: 'languages',
-    color: 'from-sky-500 to-blue-500',
-    skills: [
-      { name: 'JavaScript', icon: SiJavascript, level: 90 },
-      { name: 'TypeScript', icon: SiTypescript, level: 85 },
-      { name: 'Python', icon: SiPython, level: 45 },
-      { name: 'Html', icon: SiHtml5, level: 45 },
-      { name: 'Css', icon: SiCss, level: 45 },
-    ],
-  },
-  {
-    key: 'frontend',
-    color: 'from-blue-500 to-cyan-500',
-    skills: [
-      { name: 'React', icon: SiReact, level: 65 },
-      { name: 'Next.js', icon: SiNextdotjs, level: 65 },
-      { name: 'Tailwind CSS', icon: SiTailwindcss, level: 45 },
-      { name: 'Ark UI', icon: SiArkecosystem, level: 40 },
-      { name: 'Framer Motion', icon: SiFramer, level: 58 },
-    ],
-  },
-  {
-    key: 'aiMl',
-    color: 'from-purple-500 to-pink-500',
-    skills: [
-      { name: 'OpenAI', icon: SiOpenai, level: 75 },
-      { name: 'Anthropic', icon: SiAnthropic, level: 75 },
-      { name: 'GenAI', icon: GrGenai, level: 75 },
-      { name: 'Meta AI', icon: SiMeta, level: 68 },
-      { name: 'PyTorch', icon: SiPytorch, level: 15 },
-    ],
-  },
-  {
-    key: 'backend',
-    color: 'from-green-500 to-emerald-500',
-    skills: [
-      { name: 'Node.js', icon: SiNodedotjs, level: 90 },
-      { name: 'Bun.js', icon: SiBun, level: 65 },
-      { name: 'Express.js', icon: SiExpress, level: 85 },
-      { name: 'Socket.IO', icon: SiSocketdotio, level: 54 },
-      { name: 'Resend', icon: SiResend, level: 60 },
-    ],
-  },
-  {
-    key: 'devops',
-    color: 'from-orange-500 to-amber-500',
-    skills: [
-      { name: 'Vercel', icon: SiVercel, level: 78 },
-      { name: 'Render', icon: SiRender, level: 55 },
-      { name: 'Fly.io', icon: SiFlydotio, level: 20 },
-    ],
-  },
-  {
-    key: 'system',
-    color: 'from-red-500 to-rose-500',
-    skills: [
-      { name: 'Git', icon: SiGit, level: 66 },
-      { name: 'Redis', icon: SiRedis, level: 41 },
-      { name: 'Linux', icon: SiLinux, level: 38 },
-    ],
-  },
-  {
-    key: 'design',
-    color: 'from-indigo-500 to-violet-500',
-    skills: [
-      { name: 'Figma', icon: SiFigma, level: 67 },
-      { name: 'Penpot', icon: SiPenpot, level: 34 },
-      { name: 'Framer', icon: SiFramer, level: 35 },
-    ],
-  },
-  {
-    key: 'databaseCloud',
-    color: 'from-cyan-500 to-teal-500',
-    skills: [
-      { name: 'Firebase Realtime', icon: SiFirebase, level: 82 },
-      { name: 'Cloudinary', icon: SiCloudinary, level: 45 },
-      { name: 'Firebase Storage', icon: SiFirebase, level: 45 },
-    ],
-  },
-]
+const totalSkills = allSkills.length
+const totalCategories = skillCategories.length
+const averageLevel = totalSkills
+  ? Math.round(allSkills.reduce((sum, skill) => sum + skill.level, 0) / totalSkills)
+  : 0
+
+const SPLIT = 'grid gap-x-16 gap-y-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,9fr)]'
+const STICKY_ASIDE = 'lg:sticky lg:top-[calc(var(--nav-h)+var(--bar-h)+2rem)] lg:self-start'
+const FADE = { duration: 0.22, ease: EASE_OUT }
 
 export default function SkillsPage() {
   const { t } = useI18n()
+  const reduced = useReducedMotion()
+
+  const [query, setQuery] = useState('')
+  const [category, setCategory] = useState<SkillFilter>('all')
+  const [sort, setSort] = useState<SkillSort>('category')
+  const [target, setTarget] = useState<{ id: string; at: number } | null>(null)
+  const [highlightId, setHighlightId] = useState<string | null>(null)
+
+  const listRef = useRef<HTMLDivElement>(null)
+  const barRef = useRef<HTMLDivElement>(null)
+
+  const needle = query.trim().toLowerCase()
+
+  const visible = useMemo(
+    () =>
+      allSkills.filter(
+        (skill) =>
+          (category === 'all' || skill.category === category) &&
+          (needle === '' || skill.name.toLowerCase().includes(needle)),
+      ),
+    [category, needle],
+  )
+  const visibleIds = useMemo(() => new Set(visible.map((skill) => skill.id)), [visible])
+
+  const groups = useMemo(
+    () =>
+      skillCategories
+        .map((group) => ({ key: group.key, skills: group.skills.filter((skill) => visibleIds.has(skill.id)) }))
+        .filter((group) => group.skills.length > 0),
+    [visibleIds],
+  )
+
+  const flat = useMemo(() => {
+    const list = [...visible]
+    if (sort === 'level') list.sort((a, b) => b.level - a.level || a.name.localeCompare(b.name, 'en'))
+    if (sort === 'name') list.sort((a, b) => a.name.localeCompare(b.name, 'en'))
+    return list
+  }, [visible, sort])
+
+  // The sticky category column sits under the sticky toolbar, whatever height the toolbar wraps to.
+  useEffect(() => {
+    const bar = barRef.current
+    const list = listRef.current
+    if (!bar || !list) return
+    const sync = () => list.style.setProperty('--bar-h', `${bar.offsetHeight}px`)
+    sync()
+    const observer = new ResizeObserver(sync)
+    observer.observe(bar)
+    return () => observer.disconnect()
+  }, [])
+
+  // A heat-board cell was selected: bring its row into view, then let the highlight fade.
+  useEffect(() => {
+    if (!target) return
+    const frame = requestAnimationFrame(() => {
+      const row = document.getElementById(skillRowId(target.id))
+      if (!row) return
+      row.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'center' })
+      row.focus({ preventScroll: true })
+    })
+    const timer = window.setTimeout(() => setHighlightId(null), 2800)
+    return () => {
+      cancelAnimationFrame(frame)
+      window.clearTimeout(timer)
+    }
+  }, [target, reduced])
+
+  const revealSkill = (id: string) => {
+    if (!visibleIds.has(id)) {
+      setQuery('')
+      setCategory('all')
+    }
+    setHighlightId(id)
+    setTarget({ id, at: Date.now() })
+  }
+
+  const categoryName = (key: string) => t(`skills.categories.${key}.name`)
+  const countWord = (count: number) => t(count === 1 ? 'skillsPage.count.one' : 'skillsPage.count.other')
+  const gaugeLabel = (name: string) => fill(t('skillsPage.row.gauge'), { name })
+
+  const view = visible.length === 0 ? 'empty' : sort
+  const summary = [
+    { label: t('skillsPage.summary.technologies'), value: totalSkills, suffix: '' },
+    { label: t('skillsPage.summary.categories'), value: totalCategories, suffix: '' },
+    { label: t('skillsPage.summary.average'), value: averageLevel, suffix: '%' },
+  ]
 
   return (
-    <main className="relative min-h-screen overflow-hidden">
-      <Navbar />
-      
-      <section className="relative pt-32 pb-24 sm:pb-32 overflow-hidden">
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-1/4 right-0 w-80 h-80 bg-accent/10 rounded-full blur-[100px]" />
-          <div className="absolute bottom-1/4 left-1/4 w-72 h-72 bg-primary/10 rounded-full blur-[100px]" />
-        </div>
+    <MotionConfig reducedMotion="user">
+      <main id="main" className="relative min-h-screen">
+        <Navbar />
 
-        <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <Link href="/">
-            <Button variant="ghost" className="mb-8 gap-2">
-              <ArrowLeft className="w-4 h-4" />
-              {t('nav.home')}
-            </Button>
-          </Link>
+        <header className="shell pt-[calc(var(--nav-h)+3rem)]">
+          <div className="grid items-end gap-x-16 gap-y-10 lg:grid-cols-[minmax(0,9fr)_minmax(0,5fr)]">
+            <div>
+              <SplitText as="h1" text={t('skills.title')} trigger="mount" className="t-title" />
+              <Reveal variant="unblur" delay={0.25} as="p" className="t-lead mt-5">
+                {t('skills.subtitle')}
+              </Reveal>
+            </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="text-center mb-16"
-          >
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-4">
-              {t('skills.title')}
-            </h1>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              {t('skills.subtitle')}
-            </p>
-          </motion.div>
-
-          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-            {skillCategories.map((category, categoryIndex) => (
-              <motion.div
-                key={category.key}
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: categoryIndex * 0.1 }}
-                className="glass-card p-6 group hover:scale-[1.02] transition-transform"
-              >
+            <dl aria-label={t('skillsPage.summary.label')} className="border-t border-border">
+              {summary.map((item) => (
                 <div
-                  className={`inline-flex px-4 py-2 rounded-full bg-gradient-to-r ${category.color} mb-4`}
+                  key={item.label}
+                  className="flex items-baseline justify-between gap-6 border-b border-border py-3"
                 >
-                  <span className="text-sm font-semibold text-white">
-                    {t(`skills.categories.${category.key}.name`)}
-                  </span>
+                  <dt className="text-sm text-muted-foreground">{item.label}</dt>
+                  <dd className="font-mono text-lg leading-none">
+                    <CountUp value={item.value} suffix={item.suffix} />
+                  </dd>
                 </div>
-                <p className="text-sm text-muted-foreground mb-6">
-                  {t(`skills.categories.${category.key}.description`)}
-                </p>
+              ))}
+            </dl>
+          </div>
+        </header>
 
-                <div className="space-y-4">
-                  {category.skills.map((skill, skillIndex) => (
-                    <motion.div
-                      key={skill.name}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.3, delay: categoryIndex * 0.1 + skillIndex * 0.05 }}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-2">
-                          <skill.icon className="w-4 h-4 text-muted-foreground" />
-                          <span className="font-mono text-sm text-foreground">{skill.name}</span>
+        <HeatBoard visibleIds={visibleIds} selectedId={highlightId} onSelect={revealSkill} />
+
+        <div ref={listRef} className="mt-12 [--bar-h:8rem] sm:mt-16">
+          <div
+            ref={barRef}
+            className="z-30 border-b border-border bg-background lg:sticky lg:top-[var(--nav-h)]"
+          >
+            <SkillsToolbar
+              query={query}
+              onQueryChange={setQuery}
+              category={category}
+              onCategoryChange={setCategory}
+              sort={sort}
+              onSortChange={setSort}
+              shown={visible.length}
+              total={totalSkills}
+            />
+          </div>
+
+          <div className="shell min-h-[60vh] pb-24 sm:pb-32">
+            <AnimatePresence mode="wait" initial={false}>
+              {view === 'empty' ? (
+                <motion.div
+                  key="empty"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={FADE}
+                  className="max-w-xl py-16 sm:py-24"
+                >
+                  <h2 className="t-heading">{fill(t('skillsPage.empty.title'), { query: query.trim() })}</h2>
+                  <p className="mt-3 text-muted-foreground">
+                    {category === 'all'
+                      ? t('skillsPage.empty.body')
+                      : fill(t('skillsPage.empty.bodyInCategory'), { category: categoryName(category) })}
+                  </p>
+                  <div className="mt-8 flex flex-wrap gap-3">
+                    <button type="button" className="btn btn-primary" onClick={() => setQuery('')}>
+                      {t('skillsPage.empty.clear')}
+                    </button>
+                    {category !== 'all' ? (
+                      <button type="button" className="btn btn-ghost" onClick={() => setCategory('all')}>
+                        {t('skillsPage.empty.showAll')}
+                      </button>
+                    ) : null}
+                  </div>
+                </motion.div>
+              ) : view === 'category' ? (
+                <motion.div
+                  key="category"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={FADE}
+                >
+                  <AnimatePresence initial={false}>
+                    {groups.map((group) => (
+                      <motion.section
+                        key={group.key}
+                        layout="position"
+                        aria-labelledby={`category-${group.key}`}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ opacity: FADE, layout: { duration: 0.28, ease: EASE_OUT } }}
+                        className={`${SPLIT} border-t border-border py-12 first:border-t-0 lg:py-16`}
+                      >
+                        <div className={STICKY_ASIDE}>
+                          <h2 id={`category-${group.key}`} className="t-heading">
+                            {categoryName(group.key)}
+                          </h2>
+                          <p className="mt-3 max-w-[40ch] text-muted-foreground">
+                            {t(`skills.categories.${group.key}.description`)}
+                          </p>
+                          <p className="mt-5 text-sm text-muted-foreground">
+                            <span className="t-data mr-1.5 text-foreground">{group.skills.length}</span>
+                            {countWord(group.skills.length)}
+                          </p>
                         </div>
-                        <span className="text-xs text-muted-foreground">{skill.level}%</span>
-                      </div>
-                      <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={{ width: `${skill.level}%` }}
-                          transition={{ duration: 1, delay: categoryIndex * 0.1 + skillIndex * 0.1 }}
-                          className={`h-full bg-gradient-to-r ${category.color} rounded-full`}
+                        <ul className="divide-y divide-border">
+                          <AnimatePresence initial={false}>
+                            {group.skills.map((skill) => (
+                              <SkillRow
+                                key={skill.id}
+                                skill={skill}
+                                gaugeLabel={gaugeLabel(skill.name)}
+                                highlighted={highlightId === skill.id}
+                              />
+                            ))}
+                          </AnimatePresence>
+                        </ul>
+                      </motion.section>
+                    ))}
+                  </AnimatePresence>
+                </motion.div>
+              ) : (
+                <motion.section
+                  key={view}
+                  aria-labelledby="flat-list-title"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={FADE}
+                  className={`${SPLIT} py-12 lg:py-16`}
+                >
+                  <div className={STICKY_ASIDE}>
+                    <h2 id="flat-list-title" className="t-heading">
+                      {t(view === 'level' ? 'skillsPage.flat.levelTitle' : 'skillsPage.flat.nameTitle')}
+                    </h2>
+                    <p className="mt-3 max-w-[40ch] text-muted-foreground">
+                      {t(view === 'level' ? 'skillsPage.flat.levelDescription' : 'skillsPage.flat.nameDescription')}
+                    </p>
+                    <p className="mt-5 text-sm text-muted-foreground">
+                      <span className="t-data mr-1.5 text-foreground">{flat.length}</span>
+                      {countWord(flat.length)}
+                    </p>
+                  </div>
+                  <ol className="divide-y divide-border">
+                    <AnimatePresence initial={false}>
+                      {flat.map((skill, index) => (
+                        <SkillRow
+                          key={skill.id}
+                          skill={skill}
+                          gaugeLabel={gaugeLabel(skill.name)}
+                          rank={view === 'level' ? index + 1 : undefined}
+                          meta={categoryName(skill.category)}
+                          highlighted={highlightId === skill.id}
                         />
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
-              </motion.div>
-            ))}
+                      ))}
+                    </AnimatePresence>
+                  </ol>
+                </motion.section>
+              )}
+            </AnimatePresence>
           </div>
         </div>
-      </section>
-      
-      <Footer />
-    </main>
+
+        <Footer />
+      </main>
+    </MotionConfig>
   )
 }

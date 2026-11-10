@@ -1,10 +1,14 @@
 'use client'
 
 import { createContext, useContext, useState, ReactNode } from 'react'
+import { homeTranslations } from '@/lib/i18n/home'
+import { skillsTranslations } from '@/lib/i18n/skills'
+import { projectsTranslations } from '@/lib/i18n/projects'
+import { chromeTranslations } from '@/lib/i18n/chrome'
 
 export type Language = 'en' | 'ja' | 'ru' | 'az' | 'tr' | 'kk' | 'ky'
 
-interface Translations {
+export interface Translations {
   [key: string]: string | Translations
 }
 
@@ -1120,11 +1124,21 @@ function mergeTranslations(base: Translations, extension: Translations): Transla
   return merged
 }
 
+// Per-area dictionaries live in lib/i18n/*.ts so each area of the site owns its own copy.
+const areaTranslations = [homeTranslations, skillsTranslations, projectsTranslations, chromeTranslations]
+
 const translations = (Object.keys(baseTranslations) as Language[]).reduce(
   (acc, lang) => {
-    acc[lang] = translationExtensions[lang]
+    let merged = translationExtensions[lang]
       ? mergeTranslations(baseTranslations[lang], translationExtensions[lang] as Translations)
       : baseTranslations[lang]
+    for (const area of areaTranslations) {
+      const extra = area[lang]
+      if (extra) {
+        merged = mergeTranslations(merged, extra)
+      }
+    }
+    acc[lang] = merged
     return acc
   },
   {} as Record<Language, Translations>

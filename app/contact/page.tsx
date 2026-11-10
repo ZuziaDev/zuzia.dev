@@ -1,292 +1,600 @@
 'use client'
 
-import { useState, useRef, useEffect, FormEvent } from 'react'
-import { motion } from 'framer-motion'
-import { ArrowLeft, Send, Loader2 } from 'lucide-react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from 'react'
+import { motion, useReducedMotion } from 'framer-motion'
+import { ArrowUpRight, Check, CornerDownLeft, Mail, X } from 'lucide-react'
 import { Navbar } from '@/components/navbar'
 import { Footer } from '@/components/footer'
-import { Button } from '@/components/ui/button'
-import Link from 'next/link'
+import { EASE_OUT, Reveal, SplitText } from '@/components/fx/motion'
 import { useI18n } from '@/lib/i18n-context'
+import { socialLinks } from '@/lib/site'
+import { cn } from '@/lib/utils'
 
-interface TerminalLine {
-  type: 'command' | 'output' | 'error' | 'success' | 'input'
-  content: string
-}
+const CONTACT_EMAIL = 'contact@zuzia.dev'
+const HOST_TITLE = 'zuzia@portfolio:~/contact'
+// Same rule the API applies, so the terminal rejects what the server would reject.
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+type Step = 'command' | 'name' | 'email' | 'message' | 'confirm' | 'sending'
+type Status = 'ready' | 'composing' | 'sending' | 'sent' | 'failed'
+
+/** A piece of a line: literal text, or an i18n key resolved at render so the log follows the language. */
+type Part = string | { k: string }
+
+type Line = { id: number } & (
+  | { kind: 'command' | 'output' | 'error' | 'success' | 'entry'; parts: Part[] }
+  | { kind: 'link'; labelKey: string; href: string; text: string }
+  | { kind: 'receipt'; name: string; email: string; length: number; at: number; reference?: string }
+)
+
+type NewLine = Line extends infer L ? (L extends { id: number } ? Omit<L, 'id'> : never) : never
+
+const k = (key: string): Part => ({ k: key })
+const out = (...parts: Part[]): NewLine => ({ kind: 'output', parts })
+const err = (...parts: Part[]): NewLine => ({ kind: 'error', parts })
+const ok = (...parts: Part[]): NewLine => ({ kind: 'success', parts })
+
+const COMMAND_CHIPS = ['help', 'email', 'social', 'send', 'clear']
+
+const stripProtocol = (href: string) => href.replace(/^https?:\/\//, '')
+
+let lineId = 0
+const withIds = (lines: NewLine[]): Line[] => lines.map((line) => ({ ...line, id: ++lineId }) as Line)
 
 export default function ContactPage() {
-  const { t } = useI18n()
-  const [lines, setLines] = useState<TerminalLine[]>([
-    { type: 'output', content: t('contact.welcomeMessage') },
-    { type: 'output', content: t('contact.helpHint') },
-  ])
-  const [input, setInput] = useState('')
-  const [showForm, setShowForm] = useState(false)
-  const [formData, setFormData] = useState({ name: '', email: '', message: '' })
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const terminalRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const { t, language } = useI18n()
+  const reduced = useReducedMotion()
 
+  const [lines, setLines] = useState<Line[]>(() =>
+    withIds([out(k('contact.welcomeMessage')), out(k('contact.helpHint'))]),
+  )
+  const [step, setStep] = useState<Step>('command')
+  const [status, setStatus] = useState<Status>('ready')
+  const [input, setInput] = useState('')
+  const [draft, setDraft] = useState({ name: '', email: '', message: '' })
+
+  const logRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const areaRef = useRef<HTMLTextAreaElement>(null)
+  const history = useRef<string[]>([])
+  const historyIndex = useRef(-1)
+
+  const print = (...next: NewLine[]) => setLines((prev) => [...prev, ...withIds(next)])
+  const focusInput = () => (step === 'message' ? areaRef.current : inputRef.current)?.focus()
+
+  // Keep the newest output in view.
   useEffect(() => {
-    if (terminalRef.current) {
-      terminalRef.current.scrollTop = terminalRef.current.scrollHeight
-    }
+    const log = logRef.current
+    if (log) log.scrollTop = log.scrollHeight
   }, [lines])
 
-  const processCommand = (cmd: string) => {
-    const command = cmd.trim().toLowerCase()
-    const newLines: TerminalLine[] = [{ type: 'command', content: `$ ${cmd}` }]
-
-    switch (command) {
-      case 'help':
-        newLines.push(
-          { type: 'output', content: t('contact.commandsTitle') },
-          { type: 'output', content: t('contact.commands.help') },
-          { type: 'output', content: t('contact.commands.email') },
-          { type: 'output', content: t('contact.commands.social') },
-          { type: 'output', content: t('contact.commands.contact') },
-          { type: 'output', content: t('contact.commands.send') },
-          { type: 'output', content: t('contact.commands.clear') }
-        )
-        break
-      case 'email':
-        newLines.push({ type: 'success', content: 'contact@zuzia.dev' })
-        break
-
-      case 'social':
-        newLines.push(
-          { type: 'output', content: t('contact.socialLinksTitle') },
-          { type: 'output', content: `  ${t('social.github')}:    github.com/ZuziaDev` },
-          { type: 'output', content: `  ${t('social.discord')}:   discord.gg/gSfkTJkr5U` },
-          { type: 'output', content: `  ${t('social.twitter')}:         twitter.com/ZuziaInc` },
-          { type: 'output', content: `  ${t('social.youtube')}:   youtube.com/@ZuziaInc` },
-          { type: 'output', content: `  ${t('social.instagram')}: instagram.com/ridvan.veli.0` }
-        )
-        break
-      case 'contact':
-      case 'send':
-        setShowForm(true)
-        newLines.push({ type: 'success', content: t('contact.openingForm') })
-        break
-      case 'clear':
-        setLines([])
-        return
-      default:
-        newLines.push({
-          type: 'error',
-          content: `${t('contact.commandNotFoundPrefix')}${cmd}${t('contact.commandNotFoundSuffix')}`,
-        })
+  // Put the caret in the prompt for mouse and keyboard visitors; on touch that would open the keyboard unasked.
+  useEffect(() => {
+    if (window.matchMedia('(pointer: fine)').matches) {
+      inputRef.current?.focus({ preventScroll: true })
     }
+  }, [])
 
-    setLines((prev) => [...prev, ...newLines])
+  // The prompt swaps between an input and a textarea; keep focus across the swap.
+  const previousStep = useRef<Step>(step)
+  useEffect(() => {
+    if (previousStep.current !== step) {
+      previousStep.current = step
+      ;(step === 'message' ? areaRef.current : inputRef.current)?.focus({ preventScroll: true })
+    }
+  }, [step])
+
+  const cancelFlow = () => {
+    setDraft({ name: '', email: '', message: '' })
+    setStep('command')
+    setStatus('ready')
+    print(out(k('chrome.contact.cancelled')))
   }
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault()
-    setIsSubmitting(true)
+  const deliver = async () => {
+    setStep('sending')
+    setStatus('sending')
+    print(out(k('contact.sending')))
 
     try {
       const response = await fetch('/api/contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(draft),
       })
       const payload = (await response.json().catch(() => null)) as
-        | { error?: string; message?: string }
+        | { error?: string; message?: string; id?: string }
         | null
 
-      if (response.ok) {
-        setLines((prev) => [
-          ...prev,
-          {
-            type: 'success',
-            content: payload?.message || t('contact.success'),
-          },
-        ])
-        setFormData({ name: '', email: '', message: '' })
-        setShowForm(false)
-      } else {
-        throw new Error(payload?.error || t('contact.error'))
+      if (!response.ok) {
+        throw new Error(payload?.error || '')
       }
-    } catch (error) {
-      setLines((prev) => [
-        ...prev,
+
+      print(
         {
-          type: 'error',
-          content: error instanceof Error ? error.message : t('contact.error'),
+          kind: 'receipt',
+          name: draft.name,
+          email: draft.email,
+          length: draft.message.length,
+          at: Date.now(),
+          reference: payload?.id,
         },
-      ])
-    } finally {
-      setIsSubmitting(false)
+        ok(k('contact.success')),
+      )
+      setDraft({ name: '', email: '', message: '' })
+      setStep('command')
+      setStatus('sent')
+    } catch (error) {
+      const detail = error instanceof Error && error.message && error.message !== 'Failed to fetch' ? error.message : ''
+      print(err(detail || k('contact.error')), out(k('chrome.contact.retryHint')))
+      // The draft is kept: back to the confirm step so "send" retries it.
+      setStep('confirm')
+      setStatus('failed')
     }
   }
 
+  const runCommand = (raw: string) => {
+    const command = raw.trim().toLowerCase()
+    const echo: NewLine = { kind: 'command', parts: [raw.trim()] }
+
+    switch (command) {
+      case 'help':
+        print(
+          echo,
+          out(k('contact.commandsTitle')),
+          out(k('contact.commands.help')),
+          out(k('contact.commands.email')),
+          out(k('contact.commands.social')),
+          out(k('contact.commands.contact')),
+          out(k('contact.commands.send')),
+          out(k('contact.commands.clear')),
+        )
+        break
+      case 'email':
+        print(echo, {
+          kind: 'link',
+          labelKey: 'contact.email',
+          href: `mailto:${CONTACT_EMAIL}`,
+          text: CONTACT_EMAIL,
+        })
+        break
+      case 'social':
+        print(
+          echo,
+          out(k('contact.socialLinksTitle')),
+          ...socialLinks.map(
+            ({ href, labelKey }): NewLine => ({ kind: 'link', labelKey, href, text: stripProtocol(href) }),
+          ),
+        )
+        break
+      case 'contact':
+      case 'send':
+        print(echo, ok(k('contact.openingForm')), out(k('contact.name'), ':'))
+        setStep('name')
+        setStatus('composing')
+        break
+      case 'clear':
+        setLines([])
+        setStatus('ready')
+        break
+      default:
+        print(
+          echo,
+          err(k('contact.commandNotFoundPrefix'), raw.trim(), k('contact.commandNotFoundSuffix')),
+        )
+    }
+  }
+
+  /** One Enter press: routes the text to the command interpreter or the current step of the message flow. */
+  const submit = (raw: string) => {
+    if (step === 'sending') return
+    const value = raw.trim()
+    setInput('')
+    historyIndex.current = -1
+
+    if (step === 'command') {
+      if (!value) return
+      history.current = [value, ...history.current.filter((item) => item !== value)].slice(0, 50)
+      runCommand(value)
+      return
+    }
+
+    if (value.toLowerCase() === 'cancel') {
+      cancelFlow()
+      return
+    }
+
+    if (step === 'name') {
+      if (!value) {
+        print(err(k('chrome.contact.errName')))
+        return
+      }
+      setDraft((prev) => ({ ...prev, name: value }))
+      print({ kind: 'entry', parts: [k('contact.name'), ': ', value] }, out(k('contact.email'), ':'))
+      setStep('email')
+      return
+    }
+
+    if (step === 'email') {
+      if (!EMAIL_PATTERN.test(value)) {
+        print(err(k('chrome.contact.errEmail')))
+        return
+      }
+      setDraft((prev) => ({ ...prev, email: value }))
+      print(
+        { kind: 'entry', parts: [k('contact.email'), ': ', value] },
+        out(k('contact.message'), ':'),
+        out(k('chrome.contact.messageHint')),
+      )
+      setStep('message')
+      return
+    }
+
+    if (step === 'message') {
+      if (!value) {
+        print(err(k('chrome.contact.errMessage')))
+        return
+      }
+      setDraft((prev) => ({ ...prev, message: value }))
+      print({ kind: 'entry', parts: [k('contact.message'), ': ', value] }, out(k('chrome.contact.reviewHint')))
+      setStep('confirm')
+      return
+    }
+
+    // confirm
+    if (value.toLowerCase() === 'send') {
+      print({ kind: 'command', parts: ['send'] })
+      void deliver()
+    } else {
+      print(err(k('chrome.contact.confirmUnknown')))
+    }
+  }
+
+  const onSubmit = (event: FormEvent) => {
+    event.preventDefault()
+    submit(input)
+  }
+
+  const onKeyDown = (event: ReactKeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    if (event.key === 'Escape' && step !== 'command' && step !== 'sending') {
+      event.preventDefault()
+      setInput('')
+      cancelFlow()
+      return
+    }
+    if (step === 'message') {
+      if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+        event.preventDefault()
+        submit(input)
+      }
+      return
+    }
+    if (step !== 'command') return
+    const items = history.current
+    if (event.key === 'ArrowUp' && items.length) {
+      event.preventDefault()
+      historyIndex.current = Math.min(historyIndex.current + 1, items.length - 1)
+      setInput(items[historyIndex.current])
+    } else if (event.key === 'ArrowDown' && historyIndex.current >= 0) {
+      event.preventDefault()
+      historyIndex.current -= 1
+      setInput(historyIndex.current >= 0 ? items[historyIndex.current] : '')
+    }
+  }
+
+  const runChip = (command: string) => {
+    submit(command)
+    focusInput()
+  }
+
+  const sending = step === 'sending'
+  const chips = step === 'command' ? COMMAND_CHIPS : step === 'confirm' ? ['send', 'cancel'] : ['cancel']
+
+  const promptLabel =
+    step === 'name'
+      ? t('contact.name')
+      : step === 'email'
+        ? t('contact.email')
+        : step === 'message'
+          ? t('contact.message')
+          : t('contact.commandPlaceholder')
+  const placeholder =
+    step === 'name'
+      ? t('contact.namePlaceholder')
+      : step === 'email'
+        ? t('contact.emailPlaceholder')
+        : step === 'message'
+          ? t('contact.messagePlaceholder')
+          : step === 'confirm'
+            ? 'send'
+            : sending
+              ? t('contact.sending')
+              : t('contact.commandPlaceholder')
+
+  const resolve = (parts: Part[]) => parts.map((part) => (typeof part === 'string' ? part : t(part.k))).join('')
+
+  const fieldClass =
+    'min-w-0 flex-1 bg-transparent py-2.5 font-mono text-base text-foreground outline-none placeholder:text-muted-foreground/70 sm:text-sm'
+
   return (
-    <main className="relative min-h-screen overflow-hidden">
+    <>
       <Navbar />
-      
-      <section className="relative pt-32 pb-24 sm:pb-32 overflow-hidden">
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-1/3 left-0 w-96 h-96 bg-primary/10 rounded-full blur-[120px]" />
-          <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-accent/10 rounded-full blur-[100px]" />
-        </div>
+      <main id="main" className="relative min-h-screen pb-24 pt-[calc(var(--nav-h)+3rem)] sm:pb-32">
+        <div className="shell">
+          <header className="max-w-3xl">
+            <SplitText as="h1" text={t('contact.title')} trigger="mount" className="t-title" />
+            <Reveal variant="unblur" delay={0.15}>
+              <p className="t-lead mt-4">{t('contact.subtitle')}</p>
+            </Reveal>
+          </header>
 
-        <div className="relative z-10 mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-          <Link href="/">
-            <Button variant="ghost" className="mb-8 gap-2">
-              <ArrowLeft className="w-4 h-4" />
-              {t('nav.home')}
-            </Button>
-          </Link>
-
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="text-center mb-12"
-          >
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-4">
-              {t('contact.title')}
-            </h1>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              {t('contact.subtitle')}
-            </p>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="glass-card overflow-hidden"
-          >
-            {/* Terminal Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-secondary/30">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-red-500" />
-                <div className="w-3 h-3 rounded-full bg-yellow-500" />
-                <div className="w-3 h-3 rounded-full bg-green-500" />
-              </div>
-              <span className="text-sm text-muted-foreground font-mono">
-                zuzia@portfolio:~/contact
-              </span>
-              <div className="w-16" />
-            </div>
-
-            {/* Terminal Body */}
-            <div
-              ref={terminalRef}
-              className="h-[400px] overflow-y-auto p-4 font-mono text-sm bg-black/90"
-              onClick={() => inputRef.current?.focus()}
-            >
-              {lines.map((line, index) => (
-                <div
-                  key={index}
-                  className={`mb-1 ${
-                    line.type === 'command'
-                      ? 'text-cyan-400'
-                      : line.type === 'error'
-                      ? 'text-red-400'
-                      : line.type === 'success'
-                      ? 'text-green-400'
-                      : 'text-gray-300'
-                  }`}
-                >
-                  {line.content}
-                </div>
-              ))}
-
-              {showForm ? (
-                <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-                  <div>
-                    <label className="text-green-400">
-                      {t('contact.name')}:
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.name}
-                      onChange={(e) =>
-                        setFormData((prev) => ({ ...prev, name: e.target.value }))
-                      }
-                      className="w-full bg-transparent border-b border-gray-600 outline-none text-white py-1 focus:border-green-400"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="text-green-400">
-                      {t('contact.email')}:
-                    </label>
-                    <input
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) =>
-                        setFormData((prev) => ({ ...prev, email: e.target.value }))
-                      }
-                      className="w-full bg-transparent border-b border-gray-600 outline-none text-white py-1 focus:border-green-400"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="text-green-400">
-                      {t('contact.message')}:
-                    </label>
-                    <textarea
-                      value={formData.message}
-                      onChange={(e) =>
-                        setFormData((prev) => ({ ...prev, message: e.target.value }))
-                      }
-                      className="w-full bg-transparent border-b border-gray-600 outline-none text-white py-1 focus:border-green-400 resize-none"
-                      rows={4}
-                      required
-                    />
-                  </div>
-                  <div className="flex gap-4">
-                    <Button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="bg-green-600 hover:bg-green-700"
-                    >
-                      {isSubmitting ? (
-                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                      ) : (
-                        <Send className="w-4 h-4 mr-2" />
+          <div className="mt-12 grid gap-x-12 gap-y-14 lg:mt-16 lg:grid-cols-[minmax(0,1fr)_19rem] xl:grid-cols-[minmax(0,1fr)_22rem]">
+            {/* Terminal */}
+            <Reveal variant="rise" delay={0.2} className="min-w-0">
+              <section aria-label={t('chrome.contact.terminalLabel')} className="surface surface-lift overflow-hidden">
+                {/* Title strip: a title and the real state, nothing pretend. */}
+                <div className="flex min-h-11 items-center justify-between gap-4 border-b border-border bg-secondary px-4">
+                  <p className="t-data truncate text-muted-foreground">{HOST_TITLE}</p>
+                  <p
+                    role="status"
+                    className="inline-flex shrink-0 items-center gap-2 text-xs font-medium text-foreground"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        'size-2 rounded-[2px]',
+                        status === 'sending' && 'flame animate-flicker',
+                        status === 'sent' && 'bg-primary',
+                        status === 'failed' && 'bg-destructive',
+                        status === 'composing' && 'bg-heat',
+                        status === 'ready' && 'bg-muted-foreground',
                       )}
-                      {t('contact.send')}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setShowForm(false)}
-                    >
-                      {t('contact.cancel')}
-                    </Button>
-                  </div>
-                </form>
-              ) : (
-                <div className="flex items-center">
-                  <span className="text-green-400 mr-2">$</span>
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && input.trim()) {
-                        processCommand(input)
-                        setInput('')
-                      }
-                    }}
-                    className="flex-1 bg-transparent outline-none text-white caret-green-400"
-                    autoFocus
-                  />
-                  <span className="animate-pulse text-green-400">_</span>
+                    />
+                    {t(`chrome.contact.status.${status}`)}
+                  </p>
                 </div>
-              )}
-            </div>
-          </motion.div>
+
+                {/* Output log */}
+                <div
+                  ref={logRef}
+                  role="log"
+                  aria-live="polite"
+                  aria-relevant="additions"
+                  aria-label={t('chrome.contact.logLabel')}
+                  tabIndex={0}
+                  data-lenis-prevent=""
+                  onClick={() => {
+                    if (!window.getSelection()?.toString()) focusInput()
+                  }}
+                  className="h-[min(26rem,58vh)] min-h-64 cursor-text overflow-y-auto overscroll-contain bg-background px-4 py-4 font-mono text-[0.8125rem] leading-relaxed focus-visible:outline-offset-[-2px]"
+                >
+                  {lines.map((line) => (
+                    <motion.div
+                      key={line.id}
+                      initial={reduced ? false : { opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.2, ease: EASE_OUT }}
+                    >
+                      {line.kind === 'receipt' ? (
+                        <Receipt line={line} language={language} t={t} reduced={Boolean(reduced)} />
+                      ) : line.kind === 'link' ? (
+                        <p className="whitespace-pre-wrap break-words text-muted-foreground">
+                          {'  '}
+                          {t(line.labelKey)}:{' '}
+                          <a
+                            href={line.href}
+                            {...(line.href.startsWith('http')
+                              ? { target: '_blank', rel: 'noopener noreferrer' }
+                              : {})}
+                            className="text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground"
+                          >
+                            {line.text}
+                          </a>
+                        </p>
+                      ) : (
+                        <p
+                          className={cn(
+                            'whitespace-pre-wrap break-words',
+                            line.kind === 'command' && 'text-foreground',
+                            line.kind === 'entry' && 'text-foreground',
+                            line.kind === 'output' && 'text-muted-foreground',
+                            line.kind === 'error' && 'text-destructive',
+                            line.kind === 'success' && 'text-foreground',
+                          )}
+                        >
+                          {line.kind === 'command' ? (
+                            <span aria-hidden="true" className="mr-2 text-primary">
+                              $
+                            </span>
+                          ) : null}
+                          {line.kind === 'error' ? (
+                            <X aria-hidden="true" className="mr-1.5 inline size-3.5 align-[-0.15em]" />
+                          ) : null}
+                          {line.kind === 'success' ? (
+                            <Check aria-hidden="true" className="mr-1.5 inline size-3.5 align-[-0.15em] text-primary" />
+                          ) : null}
+                          {resolve(line.parts)}
+                        </p>
+                      )}
+                    </motion.div>
+                  ))}
+                </div>
+
+                {/* Prompt */}
+                <form
+                  onSubmit={onSubmit}
+                  noValidate
+                  className="flex items-start gap-2 border-t border-border bg-card pl-4 pr-1.5 focus-within:shadow-[inset_0_0_0_2px_var(--ring)]"
+                >
+                  <label
+                    htmlFor="terminal-input"
+                    className="shrink-0 py-2.5 font-mono text-base leading-6 text-primary sm:text-sm sm:leading-6"
+                  >
+                    <span aria-hidden="true">{step === 'command' || sending ? '$' : '>'}</span>
+                    <span className="sr-only">{promptLabel}</span>
+                  </label>
+                  {step === 'message' ? (
+                    <textarea
+                      ref={areaRef}
+                      id="terminal-input"
+                      rows={3}
+                      value={input}
+                      onChange={(event) => setInput(event.target.value)}
+                      onKeyDown={onKeyDown}
+                      placeholder={placeholder}
+                      spellCheck
+                      className={cn(fieldClass, 'resize-none leading-6')}
+                    />
+                  ) : (
+                    <input
+                      ref={inputRef}
+                      id="terminal-input"
+                      type={step === 'email' ? 'email' : 'text'}
+                      inputMode={step === 'email' ? 'email' : 'text'}
+                      value={input}
+                      onChange={(event) => setInput(event.target.value)}
+                      onKeyDown={onKeyDown}
+                      placeholder={placeholder}
+                      readOnly={sending}
+                      aria-busy={sending}
+                      autoComplete={step === 'name' ? 'name' : step === 'email' ? 'email' : 'off'}
+                      autoCapitalize="off"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      className={cn(fieldClass, 'h-11 leading-6')}
+                    />
+                  )}
+                  <button
+                    type="submit"
+                    aria-disabled={sending}
+                    aria-label={t('chrome.contact.run')}
+                    className="inline-flex size-11 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-foreground aria-disabled:opacity-50"
+                  >
+                    <CornerDownLeft className="size-4" aria-hidden="true" />
+                  </button>
+                </form>
+
+                {/* Shortcuts for people who would rather not type */}
+                <div
+                  role="group"
+                  aria-label={t('chrome.contact.suggestions')}
+                  className="flex flex-wrap gap-2 border-t border-border bg-card px-4 py-3"
+                >
+                  {chips.map((command) => (
+                    <button
+                      key={command}
+                      type="button"
+                      disabled={sending}
+                      onClick={() => runChip(command)}
+                      className="chip min-h-11 px-4 text-xs disabled:opacity-50"
+                    >
+                      {command}
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <p className="mt-4 max-w-[62ch] text-sm text-muted-foreground">{t('chrome.contact.keysHint')}</p>
+            </Reveal>
+
+            {/* Direct alternatives */}
+            <Reveal variant="slide" delay={0.3} as="section" className="min-w-0">
+              <h2 className="t-heading">{t('chrome.contact.directTitle')}</h2>
+              <p className="mt-2 text-sm text-muted-foreground">{t('chrome.contact.directLead')}</p>
+              <ul className="mt-6 border-t border-border">
+                <li className="border-b border-border">
+                  <a href={`mailto:${CONTACT_EMAIL}`} className="group flex min-h-14 items-center gap-3 py-2">
+                    <Mail aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-semibold">{t('contact.email')}</span>
+                      <span className="t-data block truncate text-muted-foreground">{CONTACT_EMAIL}</span>
+                    </span>
+                    <ArrowUpRight
+                      aria-hidden="true"
+                      className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-foreground"
+                    />
+                  </a>
+                </li>
+                {socialLinks.map(({ icon: Icon, href, labelKey }) => (
+                  <li key={href} className="border-b border-border">
+                    <a
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group flex min-h-14 items-center gap-3 py-2"
+                    >
+                      <Icon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-semibold">{t(labelKey)}</span>
+                        <span className="t-data block truncate text-muted-foreground">{stripProtocol(href)}</span>
+                      </span>
+                      <span className="sr-only">({t('chrome.contact.opensNewTab')})</span>
+                      <ArrowUpRight
+                        aria-hidden="true"
+                        className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-foreground"
+                      />
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </Reveal>
+          </div>
         </div>
-      </section>
-      
+      </main>
       <Footer />
-    </main>
+    </>
+  )
+}
+
+/** The confirmation, printed as an order ticket. */
+function Receipt({
+  line,
+  language,
+  t,
+  reduced,
+}: {
+  line: Extract<Line, { kind: 'receipt' }>
+  language: string
+  t: (key: string) => string
+  reduced: boolean
+}) {
+  const sentAt = new Date(line.at)
+  const rows: [string, string][] = [
+    [t('chrome.contact.receiptFrom'), line.name],
+    [t('chrome.contact.receiptReply'), line.email],
+    [t('chrome.contact.receiptLength'), `${line.length} ${t('chrome.contact.characters')}`],
+    [
+      t('chrome.contact.receiptSent'),
+      new Intl.DateTimeFormat(language, { dateStyle: 'medium', timeStyle: 'short' }).format(sentAt),
+    ],
+  ]
+  if (line.reference) rows.push([t('chrome.contact.receiptRef'), line.reference])
+
+  return (
+    <motion.div
+      className="ticket my-4 w-full max-w-sm"
+      initial={reduced ? false : { clipPath: 'inset(0 0 100% 0)' }}
+      animate={{ clipPath: 'inset(0 0 0% 0)' }}
+      transition={{ duration: 0.8, ease: EASE_OUT }}
+    >
+      <p className="font-display text-base font-semibold tracking-tight">{t('chrome.contact.receiptTitle')}</p>
+      <hr className="ticket-rule" />
+      <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-xs">
+        {rows.map(([label, value]) => (
+          <div key={label} className="contents">
+            <dt className="font-sans text-muted-foreground">{label}</dt>
+            <dd className="break-words text-right">{value}</dd>
+          </div>
+        ))}
+      </dl>
+      <hr className="ticket-rule" />
+      <p className="font-sans text-sm text-muted-foreground">{t('contact.successDetail')}</p>
+    </motion.div>
   )
 }
