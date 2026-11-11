@@ -11,6 +11,41 @@ interface ContactRequestBody {
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
+/**
+ * Sends a copy of each contact message to Telegram through a bot.
+ * Needs TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID. Without them the step is skipped,
+ * and the email still goes out. Failures here never fail the request.
+ */
+async function notifyTelegram(payload: { name: string; email: string; subject: string; message: string }) {
+  const token = process.env.TELEGRAM_BOT_TOKEN
+  const chatId = process.env.TELEGRAM_CHAT_ID
+  if (!token || !chatId) return
+
+  const escape = (value: string) => value.replace(/[&<>]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[ch] as string)
+  const text = [
+    '<b>Yeni iletişim mesajı</b>',
+    `<b>Ad:</b> ${escape(payload.name)}`,
+    `<b>E-posta:</b> ${escape(payload.email)}`,
+    payload.subject ? `<b>Konu:</b> ${escape(payload.subject)}` : null,
+    '',
+    escape(payload.message).slice(0, 3500),
+  ]
+    .filter((line) => line !== null)
+    .join('\n')
+
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML', disable_web_page_preview: true }),
+      signal: AbortSignal.timeout(8000),
+    })
+    if (!res.ok) console.error('Telegram notify failed', res.status)
+  } catch (error) {
+    console.error('Telegram notify error', error)
+  }
+}
+
 function normalizeField(value: unknown) {
   return typeof value === 'string' ? value.trim() : ''
 }
@@ -69,6 +104,10 @@ export async function POST(request: Request) {
         { status: 503 }
       )
     }
+
+    // Awaited, not fire-and-forget: serverless runtimes can freeze after the response is sent.
+    // notifyTelegram has its own 8s timeout and never throws.
+    await notifyTelegram({ name, email, subject, message })
 
     const resend = new Resend(resendApiKey)
     const toAddress = extractEmailAddress(toEmail)

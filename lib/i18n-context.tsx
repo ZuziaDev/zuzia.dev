@@ -750,9 +750,9 @@ const translationExtensions: Partial<Record<Language, Translations>> = {
       source: 'Source',
       discord: 'Discord',
       items: {
-        neuroa: {
-          title: 'Neuroa AI',
-          description: 'A creative AI project and community space where I experiment with tools, ideas, and artistic workflows.',
+        varynth: {
+          title: 'Varynth',
+          description: 'A local coding workspace in Rust: a terminal UI, a swarm of models working through goals, and an encrypted local vault for your keys.',
         },
         noteai: {
           title: 'NoteAI',
@@ -761,10 +761,6 @@ const translationExtensions: Partial<Record<Language, Translations>> = {
         mirai: {
           title: 'Mirai 2.0',
           description: 'A lightweight AI experiment where I explore prompting, assistant behaviors, and generative workflows.',
-        },
-        neuroaBot: {
-          title: 'Neuroa Bot',
-          description: 'A community-focused bot project built around automation, utility features, and AI-assisted interaction.',
         },
       },
     },
@@ -958,9 +954,9 @@ const translationExtensions: Partial<Record<Language, Translations>> = {
       source: 'Kaynak',
       discord: 'Discord',
       items: {
-        neuroa: {
-          title: 'Neuroa AI',
-          description: 'Araçlar, fikirler ve yaratıcı akışlar üzerine denemeler yaptığım yaratıcı bir yapay zekâ projesi ve topluluk alanı.',
+        varynth: {
+          title: 'Varynth',
+          description: 'Rust ile yazılmış yerel bir kodlama çalışma alanı: terminal arayüzü, hedefler üzerinde çalışan bir model sürüsü ve anahtarların için şifreli yerel kasa.',
         },
         noteai: {
           title: 'NoteAI',
@@ -969,10 +965,6 @@ const translationExtensions: Partial<Record<Language, Translations>> = {
         mirai: {
           title: 'Mirai 2.0',
           description: 'Prompt, asistan davranışları ve üretken akışlar üzerine denemeler yaptığım hafif bir yapay zekâ projesi.',
-        },
-        neuroaBot: {
-          title: 'Neuroa Bot',
-          description: 'Otomasyon, yardımcı özellikler ve yapay zekâ destekli etkileşim etrafında kurduğum topluluk odaklı bot projesi.',
         },
       },
     },

@@ -3,6 +3,8 @@ export interface Project {
   key: string
   /** file in /public */
   image: string
+  /** optional looping clip in /public, shown in place of the image on the featured frame; image is the poster */
+  video?: string
   techStack: string[]
   liveUrl?: string
   githubUrl?: string
@@ -13,11 +15,12 @@ export interface Project {
 // EDIT YOUR PROJECTS HERE
 export const projects: Project[] = [
   {
-    key: 'neuroa',
-    image: '/neuroa_banner.png',
-    techStack: ['JavaScript', 'Next.js', 'Firebase', 'Redis'],
-    liveUrl: 'https://patreon.com/NeuroaAI',
-    discordUrl: 'https://discord.gg/gSfkTJkr5U',
+    key: 'varynth',
+    image: '/varynth/varynth-poster.png',
+    video: '/varynth/varynth-promo.mp4',
+    techStack: ['Rust', 'TUI', 'MCP', 'AES-256', 'Next.js'],
+    liveUrl: 'https://varynth.zuzia.dev',
+    githubUrl: 'https://github.com/ZuziaDev/varynth',
     featured: true,
   },
   {
@@ -31,13 +34,6 @@ export const projects: Project[] = [
     image: '/mirai.png',
     techStack: ['Python', 'GenAI'],
     githubUrl: 'https://github.com/ZuziaDev/Mirai-2.0',
-  },
-  {
-    key: 'neuroaBot',
-    image: '/neuroa_banner.png',
-    techStack: ['JavaScript', 'Node.JS', 'Firebase', 'NeuroaAI'],
-    liveUrl: 'https://neuroa.pro',
-    discordUrl: 'https://discord.gg/gSfkTJkr5U',
   },
 ]
 

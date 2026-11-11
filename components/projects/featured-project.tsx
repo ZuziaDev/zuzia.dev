@@ -42,14 +42,28 @@ export function FeaturedProject({ project }: { project: Project }) {
               className="relative aspect-[15/8] overflow-hidden rounded-lg bg-secondary"
             >
               <motion.div className="absolute inset-0" style={reduced ? undefined : { scale }}>
-                <Image
-                  src={project.image}
-                  alt={fill(t('projectsPage.artAlt'), { title })}
-                  fill
-                  priority
-                  sizes="(min-width: 1280px) 900px, (min-width: 1024px) 72vw, 100vw"
-                  className="object-cover"
-                />
+                {project.video && !reduced ? (
+                  <video
+                    src={project.video}
+                    poster={project.image}
+                    aria-label={fill(t('projectsPage.artAlt'), { title })}
+                    className="absolute inset-0 size-full object-cover"
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    preload="metadata"
+                  />
+                ) : (
+                  <Image
+                    src={project.image}
+                    alt={fill(t('projectsPage.artAlt'), { title })}
+                    fill
+                    priority
+                    sizes="(min-width: 1280px) 900px, (min-width: 1024px) 72vw, 100vw"
+                    className="object-cover"
+                  />
+                )}
               </motion.div>
             </motion.div>
 

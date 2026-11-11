@@ -13,8 +13,7 @@ export interface ProjectArt {
 }
 
 const ART: Record<string, ProjectArt> = {
-  '/neuroa_banner.png': { width: 750, height: 400, kind: 'banner' },
-  '/neuroa.png': { width: 2048, height: 1152, kind: 'banner' },
+  '/varynth/varynth-poster.png': { width: 1920, height: 1080, kind: 'banner' },
   '/mirai.png': { width: 3072, height: 1024, kind: 'wide' },
   '/noteai.png': { width: 256, height: 256, kind: 'icon' },
 }
@@ -32,7 +31,7 @@ export function fill(template: string, vars: Record<string, string | number>): s
   )
 }
 
-/** "https://patreon.com/NeuroaAI" -> "patreon.com/NeuroaAI" */
+/** "https://varynth.zuzia.dev" -> "varynth.zuzia.dev" */
 export function linkLabel(url: string): string {
   try {
     const { hostname, pathname } = new URL(url)
